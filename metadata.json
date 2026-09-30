@@ -1,0 +1,6 @@
+{
+  "name": "Dipzon",
+  "description": "Dikey dizi ve film platformu - 9:16 sinematik dikey video ve kısa bölüm deneyimi",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
