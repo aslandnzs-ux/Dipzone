@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "776187904577",
+    "project_id": "dipzone-db3cf",
+    "storage_bucket": "dipzone-db3cf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776187904577:android:1c47995d5baefcffe27cc0",
+        "android_client_info": {
+          "package_name": "com.aistudio.dipzon.vertical"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqVcq01eKIhX0480txRR14BUkLQ6xLqOc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
