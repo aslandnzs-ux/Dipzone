@@ -8,28 +8,28 @@ data class SeriesEntity(
     @PrimaryKey val id: String,
     val title: String,
     val description: String,
-    val category: String, // "Gerilim", "Bilim Kurgu", "Romantik", "Aksiyon", "Dram", "Fantastik"
+    val category: String,
     val posterUrl: String,
     val backdropUrl: String,
     val trailerUrl: String,
     val year: Int,
-    val ageRating: String, // "16+", "18+", "13+"
+    val ageRating: String,
     val totalEpisodes: Int,
     val totalSeasons: Int,
     val director: String,
-    @androidx.room.ColumnInfo(name = "cast_members") val cast: String, // comma-separated actors
-    val matchRate: Int = 98, // percentage match
-    val viewsCount: Long = 142000L,
-    val likesCount: Long = 28500L,
+    @androidx.room.ColumnInfo(name = "cast_members") val cast: String,
+    val matchRate: Int = 0,
+    val viewsCount: Long = 0L,
+    val likesCount: Long = 0L,
     val isTrending: Boolean = false,
     val isNew: Boolean = false,
     val isEditorChoice: Boolean = false,
-    val isPublished: Boolean = true
+    val isPublished: Boolean = false
 )
 
 @Entity(tableName = "episodes")
 data class EpisodeEntity(
-    @PrimaryKey val id: String, // seriesId_s1_e1
+    @PrimaryKey val id: String,
     val seriesId: String,
     val seasonNumber: Int,
     val episodeNumber: Int,
@@ -76,21 +76,21 @@ data class CommentEntity(
     val text: String,
     val likesCount: Int = 0,
     val isSpoiler: Boolean = false,
-    val timestampFormatted: String = "2s önce",
+    val timestampFormatted: String = "Az önce",
     val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
     @PrimaryKey val id: String = "dipzon_user_1",
-    val username: String = "Deniz Sinemasever",
-    val email: String = "deniz@dipzon.com",
+    val username: String = "Dipzon Kullanıcısı",
+    val email: String = "",
     val avatarUrl: String = "",
-    val preferredGenres: String = "Gerilim,Bilim Kurgu,Aksiyon",
-    val isPremium: Boolean = true,
-    val premiumTier: String = "Dipzon VIP Ultra",
-    val coins: Int = 120,
-    val videoQuality: String = "1080p FHD",
+    val preferredGenres: String = "",
+    val isPremium: Boolean = false,
+    val premiumTier: String = "Ücretsiz",
+    val coins: Int = 0,
+    val videoQuality: String = "Otomatik",
     val dataSaver: Boolean = false,
     val subtitleLanguage: String = "Türkçe",
     val notificationsEnabled: Boolean = true
@@ -99,9 +99,16 @@ data class UserProfileEntity(
 @Entity(tableName = "analytics_events")
 data class AnalyticsEventEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val eventType: String, // "PLAY_START", "EPISODE_COMPLETE", "DROP_OFF", "SEARCH", "LIKE"
+    val eventType: String,
     val seriesId: String,
     val episodeId: String,
     val durationSeconds: Long = 0,
     val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "search_history")
+data class SearchHistoryEntity(
+    @PrimaryKey val query: String,
+    val searchedAt: Long = System.currentTimeMillis(),
+    val searchCount: Int = 1
 )

@@ -203,25 +203,12 @@ fun DipzonApp(viewModel: DipzonViewModel = viewModel()) {
                     }
                 },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        NotificationItem(
-                            title = "Yeni Bölüm Yayında! 🎬",
-                            desc = "Takip ettiğin 'Karanlık Şafak' dizisinin 2. bölümü yayınlandı.",
-                            time = "10 dk önce"
-                        )
-                        HorizontalDivider(color = DipzonBorder)
-                        NotificationItem(
-                            title = "Senin İçin Yeni Öneri",
-                            desc = "'Paralel Bağlantı' dizisi %96 eşleşme oranıyla kütüphanene eklendi.",
-                            time = "2 saat önce"
-                        )
-                        HorizontalDivider(color = DipzonBorder)
-                        NotificationItem(
-                            title = "Yorumuna Beğeni Geldi",
-                            desc = "Burak Yıldız ve 4 kişi yorumunu beğendi.",
-                            time = "Dün"
-                        )
-                    }
+                    Text(
+                        text = if (userProfile?.notificationsEnabled == false)
+                            "Bildirimler profil ayarlarından kapalı."
+                        else "Şu anda yeni bir bildirim yok.",
+                        color = DipzonTextSecondary
+                    )
                 },
                 confirmButton = {
                     Button(
@@ -237,22 +224,3 @@ fun DipzonApp(viewModel: DipzonViewModel = viewModel()) {
     }
 }
 
-@Composable
-private fun NotificationItem(
-    title: String,
-    desc: String,
-    time: String
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text(text = time, color = DipzonTextMuted, fontSize = 10.sp)
-        }
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(text = desc, color = DipzonTextSecondary, fontSize = 11.sp)
-    }
-}

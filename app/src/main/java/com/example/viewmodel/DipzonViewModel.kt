@@ -1,11 +1,16 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.DipzonDatabase
+import com.example.data.remote.FirebaseContentService
 import com.example.data.model.*
 import com.example.data.repository.DipzonRepository
+import com.example.data.repository.AdminSnapshot
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -43,13 +48,33 @@ data class PlayerUiState(
     val autoAdvanceSeconds: Int? = null // countdown for next episode
 )
 
+data class AdminAuthState(
+    val isChecking: Boolean = false,
+    val isAuthenticated: Boolean = false,
+    val email: String = "",
+    val error: String? = null
+)
+
+data class MediaUploadState(
+    val isUploading: Boolean = false,
+    val progress: Int = 0,
+    val error: String? = null
+)
+
 class DipzonViewModel(application: Application) : AndroidViewModel(application) {
 
     val repository: DipzonRepository
+    private val firebaseContent: FirebaseContentService
+    private val firebaseAuth: FirebaseAuth? = try { FirebaseAuth.getInstance() } catch (_: Exception) { null }
+    private val firestore: FirebaseFirestore? = try { FirebaseFirestore.getInstance() } catch (_: Exception) { null }
 
     init {
         val db = DipzonDatabase.getDatabase(application, viewModelScope)
-        repository = DipzonRepository(db.dipzonDao())
+        val dao = db.dipzonDao()
+        repository = DipzonRepository(dao)
+        firebaseContent = FirebaseContentService(dao, viewModelScope)
+        firebaseContent.startRealtimeSync()
+        checkExistingAdminSession()
     }
 
     // Navigation State
@@ -100,7 +125,13 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val recentSearches = MutableStateFlow(listOf("Karanlık Şafak", "Bilim Kurgu", "Kerem Bürsin", "Boğaz"))
+    val recentSearches: StateFlow<List<String>> = repository.recentSearches
+        .map { rows -> rows.map { it.query } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trendingSearches: StateFlow<List<String>> = repository.trendingSearches
+        .map { rows -> rows.map { it.query } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Player State
     private val _playerState = MutableStateFlow(PlayerUiState())
@@ -118,8 +149,17 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
     val adminAllSeries: StateFlow<List<SeriesEntity>> = repository.adminAllSeries
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _adminStats = MutableStateFlow(Triple(0, 0, 0))
-    val adminStats: StateFlow<Triple<Int, Int, Int>> = _adminStats.asStateFlow()
+    private val _adminStats = MutableStateFlow(AdminSnapshot())
+    val adminStats: StateFlow<AdminSnapshot> = _adminStats.asStateFlow()
+
+    val adminComments: StateFlow<List<CommentEntity>> = repository.adminComments
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _adminAuthState = MutableStateFlow(AdminAuthState())
+    val adminAuthState: StateFlow<AdminAuthState> = _adminAuthState.asStateFlow()
+
+    private val _uploadState = MutableStateFlow(MediaUploadState())
+    val uploadState: StateFlow<MediaUploadState> = _uploadState.asStateFlow()
 
     // Onboarding State
     private val _showGenreOnboarding = MutableStateFlow(false)
@@ -219,13 +259,15 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addRecentSearch(query: String) {
-        if (query.isNotBlank() && !recentSearches.value.contains(query)) {
-            recentSearches.update { (listOf(query) + it).take(8) }
-        }
+        viewModelScope.launch(Dispatchers.IO) { repository.recordSearch(query) }
     }
 
     fun clearRecentSearch(query: String) {
-        recentSearches.update { it.filter { item -> item != query } }
+        viewModelScope.launch(Dispatchers.IO) { repository.deleteSearch(query) }
+    }
+
+    fun clearAllRecentSearches() {
+        viewModelScope.launch(Dispatchers.IO) { repository.clearSearches() }
     }
 
     // Player Controls
@@ -253,22 +295,8 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
             )
         }
 
-        // Subtitle generation sync for demo
-        val current = _playerState.value
-        if (current.subtitlesEnabled) {
-            val subText = when {
-                seconds in 2..8 -> "[Sessiz adımlar ve gerilimli müzik yükselir]"
-                seconds in 9..16 -> "Dedektif Kemal: 'Herkes sakin olsun. Bu kapıdan kimse çıkmayacak.'"
-                seconds in 17..25 -> "Gizem: 'Ben hiçbir şey görmedim, yemin ederim!'"
-                seconds in 26..34 -> "[Dışarıda fırtına ve dalga sesleri çarpıyor]"
-                seconds in 35..45 -> "Dedektif Kemal: 'Telefonu bana ver. Katil aramızda.'"
-                else -> ""
-            }
-            _playerState.update { it.copy(currentSubtitleText = subText) }
-        }
-
         // Auto advance triggers when < 5 seconds left
-        if (duration > 10 && seconds >= duration - 4 && current.autoAdvanceSeconds == null) {
+        if (duration > 10 && seconds >= duration - 4 && _playerState.value.autoAdvanceSeconds == null) {
             triggerAutoAdvanceCountdown()
         }
     }
@@ -418,18 +446,15 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
         val series = current.currentSeries ?: return
         val episode = current.currentEpisode ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            val completed = current.currentPositionSeconds >= current.durationSeconds - 5
             repository.saveWatchProgress(
                 WatchProgressEntity(
-                    seriesId = series.id,
-                    episodeId = episode.id,
-                    seasonNumber = episode.seasonNumber,
-                    episodeNumber = episode.episodeNumber,
-                    positionSeconds = current.currentPositionSeconds,
-                    durationSeconds = current.durationSeconds,
-                    updatedAt = System.currentTimeMillis(),
-                    isCompleted = current.currentPositionSeconds >= current.durationSeconds - 5
+                    seriesId = series.id, episodeId = episode.id, seasonNumber = episode.seasonNumber,
+                    episodeNumber = episode.episodeNumber, positionSeconds = current.currentPositionSeconds,
+                    durationSeconds = current.durationSeconds, updatedAt = System.currentTimeMillis(), isCompleted = completed
                 )
             )
+            if (completed) repository.logAnalyticsEvent("EPISODE_COMPLETE", series.id, episode.id, current.durationSeconds)
         }
     }
 
@@ -454,6 +479,16 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun updateVideoQuality(quality: String) {
+        val profile = userProfile.value ?: return
+        viewModelScope.launch(Dispatchers.IO) { repository.updateUserProfile(profile.copy(videoQuality = quality)) }
+    }
+
+    fun updateSubtitleLanguage(language: String) {
+        val profile = userProfile.value ?: return
+        viewModelScope.launch(Dispatchers.IO) { repository.updateUserProfile(profile.copy(subtitleLanguage = language)) }
+    }
+
     fun updatePreferredGenres(genres: String) {
         val profile = userProfile.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
@@ -463,21 +498,27 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
 
     // Admin & Moderation
     fun refreshAdminStats() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val stats = repository.getAdminCounts()
-            _adminStats.value = stats
-        }
+        viewModelScope.launch(Dispatchers.IO) { _adminStats.value = repository.getAdminSnapshot() }
     }
+
+    fun episodesForSeries(seriesId: String): Flow<List<EpisodeEntity>> = repository.getEpisodesForSeries(seriesId)
 
     fun toggleSeriesPublished(seriesId: String, currentStatus: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
-            repository.setSeriesPublished(seriesId, !currentStatus)
+            val series = repository.getSeriesByIdDirect(seriesId) ?: return@launch
+            val updated = series.copy(isPublished = !currentStatus)
+            repository.saveSeries(updated)
+            firebaseContent.publishSeries(updated)
+            refreshAdminStats()
         }
     }
 
     fun deleteSeries(seriesId: String) {
         viewModelScope.launch(Dispatchers.IO) {
+            val episodes = repository.getEpisodesForSeriesDirect(seriesId)
+            episodes.forEach { firebaseContent.deleteEpisode(it.id) }
             repository.deleteSeries(seriesId)
+            firebaseContent.deleteSeries(seriesId)
             refreshAdminStats()
         }
     }
@@ -485,7 +526,116 @@ class DipzonViewModel(application: Application) : AndroidViewModel(application) 
     fun addSeries(series: SeriesEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.saveSeries(series)
+            firebaseContent.publishSeries(series)
             refreshAdminStats()
         }
     }
+
+    fun saveEpisode(episode: EpisodeEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.saveEpisode(episode)
+            firebaseContent.publishEpisode(episode)
+            val parent = repository.getSeriesByIdDirect(episode.seriesId)
+            if (parent != null) {
+                val count = repository.getEpisodesForSeriesDirect(parent.id).size
+                val updated = parent.copy(totalEpisodes = count)
+                repository.saveSeries(updated)
+                firebaseContent.publishSeries(updated)
+            }
+            refreshAdminStats()
+        }
+    }
+
+    fun deleteEpisode(episode: EpisodeEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteEpisode(episode.id)
+            firebaseContent.deleteEpisode(episode.id)
+            val parent = repository.getSeriesByIdDirect(episode.seriesId)
+            if (parent != null) {
+                val count = repository.getEpisodesForSeriesDirect(parent.id).size
+                val updated = parent.copy(totalEpisodes = count)
+                repository.saveSeries(updated)
+                firebaseContent.publishSeries(updated)
+            }
+            refreshAdminStats()
+        }
+    }
+
+    fun deleteAdminComment(commentId: String) {
+        viewModelScope.launch(Dispatchers.IO) { repository.deleteComment(commentId); refreshAdminStats() }
+    }
+
+    fun uploadMedia(uri: Uri, remotePath: String, onComplete: (Result<String>) -> Unit) {
+        _uploadState.value = MediaUploadState(isUploading = true, progress = 0)
+        firebaseContent.uploadMedia(
+            uri = uri,
+            remotePath = remotePath,
+            onProgress = { p -> _uploadState.value = MediaUploadState(true, p) },
+            onResult = { result ->
+                _uploadState.value = MediaUploadState(false, if (result.isSuccess) 100 else 0, result.exceptionOrNull()?.message)
+                onComplete(result)
+            }
+        )
+    }
+
+    fun resetUploadState() { _uploadState.value = MediaUploadState() }
+
+    fun signInAdmin(email: String, password: String) {
+        val auth = firebaseAuth
+        if (auth == null) {
+            _adminAuthState.value = AdminAuthState(error = "Firebase Auth yapılandırılmamış.")
+            return
+        }
+        if (email.isBlank() || password.isBlank()) {
+            _adminAuthState.value = AdminAuthState(error = "E-posta ve şifre gerekli.")
+            return
+        }
+        _adminAuthState.value = AdminAuthState(isChecking = true, email = email)
+        auth.signInWithEmailAndPassword(email.trim(), password)
+            .addOnSuccessListener { result ->
+                val user = result.user
+                if (user == null) {
+                    _adminAuthState.value = AdminAuthState(error = "Giriş başarısız.")
+                } else {
+                    verifyAdminRole(user.uid, user.email.orEmpty())
+                }
+            }
+            .addOnFailureListener { e -> _adminAuthState.value = AdminAuthState(error = e.localizedMessage ?: "Giriş başarısız.") }
+    }
+
+    fun signOutAdmin() {
+        firebaseAuth?.signOut()
+        _adminAuthState.value = AdminAuthState()
+    }
+
+    private fun checkExistingAdminSession() {
+        val user = firebaseAuth?.currentUser ?: return
+        verifyAdminRole(user.uid, user.email.orEmpty())
+    }
+
+    private fun verifyAdminRole(uid: String, email: String) {
+        val db = firestore
+        if (db == null) {
+            firebaseAuth?.signOut()
+            _adminAuthState.value = AdminAuthState(error = "Firestore yapılandırılmamış.")
+            return
+        }
+        _adminAuthState.value = AdminAuthState(isChecking = true, email = email)
+        db.collection("admins").document(uid).get()
+            .addOnSuccessListener { doc ->
+                val enabled = doc.exists() && doc.getBoolean("enabled") == true
+                if (enabled) {
+                    _adminAuthState.value = AdminAuthState(isAuthenticated = true, email = email)
+                    refreshAdminStats()
+                } else {
+                    firebaseAuth?.signOut()
+                    _adminAuthState.value = AdminAuthState(error = "Bu hesap yönetici olarak yetkilendirilmemiş.")
+                }
+            }
+            .addOnFailureListener { e ->
+                firebaseAuth?.signOut()
+                _adminAuthState.value = AdminAuthState(error = e.localizedMessage ?: "Yetki kontrolü başarısız.")
+            }
+    }
+
 }

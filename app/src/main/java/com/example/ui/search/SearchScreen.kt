@@ -4,10 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -22,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.SeriesPosterCard
@@ -37,252 +39,116 @@ fun SearchScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
-
-    val trendingTags = listOf("Karanlık Şafak", "Bilim Kurgu", "Kerem Bürsin", "Kırmızı Kod", "Gerilim", "Kıvanç Tatlıtuğ", "Dikey Dizi")
+    val trendingSearches by viewModel.trendingSearches.collectAsState()
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(DipzonBlack)
-            .statusBarsPadding()
+        modifier = modifier.fillMaxSize().background(DipzonBlack).statusBarsPadding()
     ) {
-        // Search Bar Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = {
-                    viewModel.onSearchQueryChanged(it)
-                },
-                placeholder = {
-                    Text(
-                        text = "Dizi, oyuncu, yönetmen veya tür ara...",
-                        color = DipzonTextMuted,
-                        fontSize = 13.sp
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Ara",
-                        tint = DipzonPurpleLight,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Temizle",
-                                tint = DipzonTextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = viewModel::onSearchQueryChanged,
+            placeholder = { Text("Dizi, oyuncu, yönetmen veya tür ara...", color = DipzonTextMuted, fontSize = 13.sp) },
+            leadingIcon = { Icon(Icons.Default.Search, "Ara", tint = DipzonPurpleLight) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                        Icon(Icons.Default.Close, "Temizle", tint = DipzonTextSecondary)
                     }
-                },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("search_text_input"),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = DipzonPurplePrimary,
-                    unfocusedBorderColor = DipzonBorder,
-                    focusedContainerColor = DipzonCard,
-                    unfocusedContainerColor = DipzonCard,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
-                ),
-                singleLine = true
-            )
-        }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().padding(16.dp).testTag("search_text_input"),
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DipzonPurplePrimary, unfocusedBorderColor = DipzonBorder,
+                focusedContainerColor = DipzonCard, unfocusedContainerColor = DipzonCard,
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White
+            ),
+            singleLine = true
+        )
 
-        // When Query is empty: Show Recent Searches & Trending Tags
         if (searchQuery.isBlank()) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
-                // Recent Searches
                 if (recentSearches.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.History,
-                                    contentDescription = null,
-                                    tint = DipzonPurpleLight,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "Son Aramalar",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Outlined.History, null, tint = DipzonPurpleLight, modifier = Modifier.size(18.dp))
+                                Text("Son Aramalar", color = Color.White, fontWeight = FontWeight.Bold)
                             }
+                            TextButton(onClick = viewModel::clearAllRecentSearches) { Text("Temizle", color = DipzonTextSecondary, fontSize = 11.sp) }
                         }
-
-                        // Tags flow
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            recentSearches.take(4).forEach { tag ->
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(recentSearches, key = { it }) { tag ->
                                 Row(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(DipzonCard)
-                                        .border(0.5.dp, DipzonBorder, RoundedCornerShape(16.dp))
-                                        .clickable {
-                                            viewModel.onSearchQueryChanged(tag)
-                                        }
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(DipzonCard)
+                                        .border(0.5.dp, DipzonBorder, RoundedCornerShape(18.dp))
+                                        .clickable { viewModel.onSearchQueryChanged(tag) }
+                                        .padding(start = 12.dp, end = 6.dp, top = 7.dp, bottom = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = tag,
-                                        color = DipzonTextSecondary,
-                                        fontSize = 11.sp
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Sil",
-                                        tint = DipzonTextMuted,
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clickable { viewModel.clearRecentSearch(tag) }
-                                    )
+                                    Text(tag, color = DipzonTextSecondary, fontSize = 11.sp)
+                                    IconButton(onClick = { viewModel.clearRecentSearch(tag) }, modifier = Modifier.size(24.dp)) {
+                                        Icon(Icons.Default.Close, "Sil", tint = DipzonTextMuted, modifier = Modifier.size(13.dp))
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // Trending Searches
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.TrendingUp,
-                            contentDescription = null,
-                            tint = DipzonAccentGold,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Gündemdeki Dikey Yapımlar",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                    }
-
+                if (trendingSearches.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        trendingTags.forEachIndexed { idx, tag ->
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Outlined.TrendingUp, null, tint = DipzonAccentGold, modifier = Modifier.size(18.dp))
+                            Text("Gerçek Arama Eğilimleri", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        trendingSearches.forEachIndexed { index, tag ->
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable {
-                                        viewModel.onSearchQueryChanged(tag)
-                                        viewModel.addRecentSearch(tag)
-                                    }
-                                    .padding(vertical = 6.dp, horizontal = 4.dp),
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                    .clickable { viewModel.onSearchQueryChanged(tag); viewModel.addRecentSearch(tag) }
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Text(
-                                    text = "${idx + 1}",
-                                    color = if (idx < 3) DipzonPurpleLight else DipzonTextMuted,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    modifier = Modifier.width(20.dp)
-                                )
-                                Text(
-                                    text = tag,
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text("${index + 1}", color = if (index < 3) DipzonPurpleLight else DipzonTextMuted, fontWeight = FontWeight.Bold, modifier = Modifier.width(20.dp))
+                                Text(tag, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
                 }
-            }
-        } else {
-            // Live Search Results Grid
-            if (searchResults.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "Sonuç Bulunamadı",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
-                        Text(
-                            text = "'$searchQuery' ile eşleşen dizi veya oyuncu bulunamadı. Farklı bir arama yapmayı deneyin.",
-                            color = DipzonTextMuted,
-                            fontSize = 12.sp,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+
+                if (recentSearches.isEmpty() && trendingSearches.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().padding(top = 72.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Search, null, tint = DipzonPurpleLight, modifier = Modifier.size(34.dp))
+                            Text("Henüz arama geçmişi yok", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("Yaptığın gerçek aramalar burada görünecek.", color = DipzonTextMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                        }
                     }
                 }
-            } else {
-                Text(
-                    text = "${searchResults.size} Sonuç Bulundu",
-                    color = DipzonTextSecondary,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                )
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(searchResults, key = { it.id }) { s ->
-                        SeriesPosterCard(
-                            series = s,
-                            width = 110.dp,
-                            onClick = {
-                                viewModel.addRecentSearch(searchQuery)
-                                onSeriesClick(s.id)
-                            }
-                        )
-                    }
+            }
+        } else if (searchResults.isEmpty()) {
+            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Sonuç Bulunamadı", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("'$searchQuery' ile eşleşen içerik bulunamadı.", color = DipzonTextMuted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                }
+            }
+        } else {
+            Text("${searchResults.size} sonuç", color = DipzonTextSecondary, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(bottom = 80.dp)
+            ) {
+                gridItems(searchResults, key = { it.id }) { series ->
+                    SeriesPosterCard(series = series, width = 110.dp, onClick = {
+                        viewModel.addRecentSearch(searchQuery)
+                        onSeriesClick(series.id)
+                    })
                 }
             }
         }
