@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Vertical 9:16 smartphone / cinema screen silhouette outline -->
+    <path
+        android:pathData="M37,25 C37,23 39,21 41,21 L67,21 C69,21 71,23 71,25 L71,83 C71,85 69,87 67,87 L41,87 C39,87 37,85 37,83 Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#7B2CBF"
+        android:fillColor="#1A0D2E" />
+
+    <!-- Speaker / camera notch pill at top -->
+    <path
+        android:pathData="M50,24 L58,24"
+        android:strokeWidth="1.5"
+        android:strokeColor="#9D4EDD"
+        android:strokeLineCap="round" />
+
+    <!-- Stylized Modern 'D' Cinema Play Ribbon -->
+    <path
+        android:pathData="M44,35 L44,73 L54,73 C62,73 66,67 66,54 C66,41 62,35 54,35 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="44"
+                android:startY="35"
+                android:endX="66"
+                android:endY="73">
+                <item android:offset="0.0" android:color="#C77DFF" />
+                <item android:offset="0.6" android:color="#9D4EDD" />
+                <item android:offset="1.0" android:color="#7B2CBF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Play Cutout inside the 'D' -->
+    <path
+        android:pathData="M50,45 L50,63 L59,54 Z"
+        android:fillColor="#0A0612" />
+
+    <!-- Neon highlight edge on phone border -->
+    <path
+        android:pathData="M39,23 L69,23"
+        android:strokeWidth="1.2"
+        android:strokeColor="#E0AAFF"
+        android:strokeLineCap="round" />
+
+    <!-- Bottom home bar -->
+    <path
+        android:pathData="M49,83 L59,83"
+        android:strokeWidth="1.5"
+        android:strokeColor="#9D4EDD"
+        android:strokeLineCap="round" />
+</vector>
